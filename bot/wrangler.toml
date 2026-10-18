@@ -1,4 +1,4 @@
-name = "biz-lawyer-bot"
+name = "urist-bot"
 main = "src/index.js"
 compatibility_date = "2026-01-01"
 
@@ -14,4 +14,4 @@ WEBAPP_URL = "https://sinterevav-dotcom.github.io/urist/"
 #   npx wrangler kv namespace create USERS
 [[kv_namespaces]]
 binding = "USERS"
-id = "ВСТАВЬТЕ_ID_ИЗ_КОМАНДЫ"
+id = "5acf0e7d1e96454caf3315f5f8a1a4b9"

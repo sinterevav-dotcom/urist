@@ -1,3 +1,3 @@
 // Адрес бота (Cloudflare Worker) после деплоя, без слэша на конце.
 // Пусто — приложение работает автономно: документы скачиваются, напоминания недоступны.
-export const API_URL = '';
+export const API_URL = 'https://urist-bot.sinterev-av.workers.dev';
