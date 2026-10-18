@@ -1,8 +1,17 @@
 // Бот «Бизнес-юрист» на Cloudflare Workers (бесплатный тариф).
-// Секреты: BOT_TOKEN, WEBHOOK_SECRET, SETUP_KEY. Переменные: WEBAPP_URL. KV: USERS.
+// Секрет: BOT_TOKEN (обязательно). Необязательно: WEBHOOK_SECRET, SETUP_KEY, WEBAPP_URL. KV: USERS.
 import { buildCalendar, daysUntil } from '../../js/lib/tax.js';
 
 const REMIND_DAYS = [3, 0];
+const DEFAULT_WEBAPP_URL = 'https://sinterevav-dotcom.github.io/urist/';
+
+// Секрет вебхука выводится из токена, чтобы не заводить отдельную переменную
+async function webhookSecret(env) {
+  if (env.WEBHOOK_SECRET) return env.WEBHOOK_SECRET;
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('webhook:' + env.BOT_TOKEN));
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 48);
+}
+const withDefaults = (env) => ({ ...env, WEBAPP_URL: env.WEBAPP_URL || DEFAULT_WEBAPP_URL });
 const MAX_FILE_BYTES = 2 * 1024 * 1024;
 
 const json = (data, status = 200) => new Response(JSON.stringify(data), {
@@ -144,7 +153,7 @@ async function runReminders(env, today = new Date()) {
 async function setup(env, origin) {
   const results = {};
   results.webhook = await tg(env, 'setWebhook', {
-    url: `${origin}/webhook`, secret_token: env.WEBHOOK_SECRET, allowed_updates: ['message'], drop_pending_updates: true,
+    url: `${origin}/webhook`, secret_token: await webhookSecret(env), allowed_updates: ['message'], drop_pending_updates: true,
   });
   results.menu = await tg(env, 'setChatMenuButton', {
     menu_button: { type: 'web_app', text: 'Открыть', web_app: { url: env.WEBAPP_URL } },
@@ -159,12 +168,13 @@ async function setup(env, origin) {
 }
 
 export const handler = {
-  async fetch(request, env) {
+  async fetch(request, rawEnv) {
+    const env = withDefaults(rawEnv);
     const url = new URL(request.url);
     if (request.method === 'OPTIONS') return new Response(null, { headers: CORS });
 
     if (url.pathname === '/webhook' && request.method === 'POST') {
-      if (request.headers.get('X-Telegram-Bot-Api-Secret-Token') !== env.WEBHOOK_SECRET) return new Response('forbidden', { status: 403 });
+      if (request.headers.get('X-Telegram-Bot-Api-Secret-Token') !== await webhookSecret(env)) return new Response('forbidden', { status: 403 });
       const update = await request.json().catch(() => null);
       if (update) await onUpdate(update, env).catch((e) => console.error('update', e));
       return new Response('ok');
@@ -179,14 +189,17 @@ export const handler = {
       return json({ ok: false, error: 'not_found' }, 404);
     }
 
-    if (url.pathname === '/setup' && url.searchParams.get('key') === env.SETUP_KEY && env.SETUP_KEY) {
+    // Разовая настройка. Безопасна при повторных вызовах: ставит вебхук на этот же воркер и кнопку на WEBAPP_URL
+    if (url.pathname === '/setup' && (!env.SETUP_KEY || url.searchParams.get('key') === env.SETUP_KEY)) {
+      if (!env.BOT_TOKEN) return json({ ok: false, error: 'Добавьте секрет BOT_TOKEN в настройках воркера' }, 500);
       return json(await setup(env, url.origin));
     }
 
     return new Response('Бизнес-юрист: бот работает', { headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
   },
 
-  async scheduled(event, env, ctx) {
+  async scheduled(event, rawEnv, ctx) {
+    const env = withDefaults(rawEnv);
     ctx.waitUntil(runReminders(env).then((n) => console.log('reminders sent', n)));
   },
 };
