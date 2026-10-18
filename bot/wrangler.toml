@@ -1,0 +1,17 @@
+name = "biz-lawyer-bot"
+main = "src/index.js"
+compatibility_date = "2026-01-01"
+
+# Каждый день в 06:00 UTC (09:00 МСК, 13:00 Новосибирск) — рассылка напоминаний
+[triggers]
+crons = ["0 6 * * *"]
+
+[vars]
+# Адрес мини-приложения (GitHub Pages / Cloudflare Pages), обязательно https
+WEBAPP_URL = "https://sinterevav-dotcom.github.io/urist/"
+
+# Хранилище подписок на напоминания. id выдаст команда:
+#   npx wrangler kv namespace create USERS
+[[kv_namespaces]]
+binding = "USERS"
+id = "ВСТАВЬТЕ_ID_ИЗ_КОМАНДЫ"
